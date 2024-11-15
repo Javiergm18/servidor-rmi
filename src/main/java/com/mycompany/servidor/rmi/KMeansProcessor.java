@@ -13,10 +13,10 @@ import java.io.File;
 public class KMeansProcessor {
 
     public String process(String filePath) {
-        // Simulación de procesamiento k-means
+        // simulacion solo de prueba no esta comleto
         File file = new File(filePath);
         if (file.exists()) {
-            // Simulación de análisis de datos y procesamiento
+            // simulacion solo de prueba no esta comleto
             return "El archivo " + file.getName() + " ha sido procesado exitosamente con k-means.";
         } else {
             return "Error: el archivo no existe.";
