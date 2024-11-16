@@ -4,7 +4,7 @@ import mpi.*;
 import java.util.*;
 import java.io.*;
 
-public class KMeans {
+public class KMeansMPI {
 
     public static void main(String[] args) throws Exception {
         MPI.Init(args);
@@ -12,18 +12,18 @@ public class KMeans {
         int rank = MPI.COMM_WORLD.Rank();
         int size = MPI.COMM_WORLD.Size();
 
-        // Parámetros de K-means
+
         int numClusters = 3;
         int maxIterations = 10;
         double[][] centroids = null;
 
-        // Nodo principal inicializa los datos
+
         if (rank == 0) {
             System.out.println("Nodo principal inicializando datos...");
             double[][] data = loadData("data.txt");
             centroids = initializeCentroids(data, numClusters);
 
-            // Dividir datos entre los nodos
+
             List<double[]>[] partitions = partitionData(data, size);
             for (int i = 1; i < size; i++) {
                 MPI.COMM_WORLD.Send(partitions[i], 0, partitions[i].size(), MPI.OBJECT, i, 0);
@@ -35,7 +35,6 @@ public class KMeans {
             System.out.println("Nodo " + rank + " esperando datos...");
         }
 
-        // Recibir datos particionados
         List<double[]> localData = new ArrayList<>();
         Object[] recvBuffer = new Object[1];
         MPI.COMM_WORLD.Recv(recvBuffer, 0, 1, MPI.OBJECT, 0, 0);
@@ -75,4 +74,5 @@ public class KMeans {
 
         MPI.Finalize();
     }
-}
+
+
