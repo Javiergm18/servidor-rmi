@@ -13,7 +13,7 @@ public class KMeans {
     public Map<Integer, List<double[]>> clusterData(List<double[]> data) {
         Random random = new Random();
 
-        // Inicializar los centroides aleatoriamente
+
         List<double[]> centroids = new ArrayList<>();
         for (int i = 0; i < numClusters; i++) {
             centroids.add(data.get(random.nextInt(data.size())));
@@ -23,13 +23,13 @@ public class KMeans {
         for (int iter = 0; iter < maxIterations; iter++) {
             clusters.clear();
 
-            // Asignar cada punto al clúster más cercano
+
             for (double[] point : data) {
                 int closestCluster = findClosestCluster(point, centroids);
                 clusters.computeIfAbsent(closestCluster, k -> new ArrayList<>()).add(point);
             }
 
-            // Actualizar los centroides
+
             for (int i = 0; i < numClusters; i++) {
                 List<double[]> clusterPoints = clusters.getOrDefault(i, new ArrayList<>());
                 if (!clusterPoints.isEmpty()) {

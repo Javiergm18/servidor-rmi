@@ -12,7 +12,7 @@ public class RMIServer implements RMIInterface {
     @Override
     public String processFile(String filePath) {
         try {
-            // Simular el procesamiento del archivo
+
             return "Archivo " + filePath + " procesado con éxito.";
         } catch (Exception e) {
             return "Error al procesar el archivo: " + e.getMessage();
@@ -21,14 +21,13 @@ public class RMIServer implements RMIInterface {
 
     public static void main(String[] args) {
         try {
-            // Configuración del servidor RMI
+
             RMIServer server = new RMIServer();
             RMIInterface stub = (RMIInterface) UnicastRemoteObject.exportObject(server, 0);
             Registry registry = LocateRegistry.createRegistry(1099);
             registry.bind("RMIInterface", stub);
             System.out.println("Servidor RMI iniciado en el puerto 1099...");
 
-            // Inicia un hilo para escuchar conexiones TCP
             Thread tcpServerThread = new Thread(() -> startTCPServer());
             tcpServerThread.start();
 
@@ -38,7 +37,6 @@ public class RMIServer implements RMIInterface {
         }
     }
 
-    // Método para iniciar un servidor TCP
     public static void startTCPServer() {
         try (ServerSocket serverSocket = new ServerSocket(5050)) {
             System.out.println("Servidor TCP escuchando en el puerto 5050...");
@@ -65,7 +63,7 @@ public class RMIServer implements RMIInterface {
             String result = "Archivo " + filePath + " procesado con éxito.";
             System.out.println("Resultado generado: " + result);
     
-            out.println(result);  // Enviar resultado
+            out.println(result);  
             System.out.println("Resultado enviado al cliente.");
             out.flush();
         } catch (IOException e) {
