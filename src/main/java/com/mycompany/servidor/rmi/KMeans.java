@@ -1,77 +1,78 @@
 package com.mycompany.servidor.rmi;
+
+import mpi.*;
 import java.util.*;
+import java.io.*;
 
 public class KMeans {
-    private int numClusters;
-    private int maxIterations;
 
-    public KMeans(int numClusters, int maxIterations) {
-        this.numClusters = numClusters;
-        this.maxIterations = maxIterations;
-    }
+    public static void main(String[] args) throws Exception {
+        MPI.Init(args);
 
-    public Map<Integer, List<double[]>> clusterData(List<double[]> data) {
-        Random random = new Random();
+        int rank = MPI.COMM_WORLD.Rank();
+        int size = MPI.COMM_WORLD.Size();
 
+        // Parámetros de K-means
+        int numClusters = 3;
+        int maxIterations = 10;
+        double[][] centroids = null;
 
-        List<double[]> centroids = new ArrayList<>();
-        for (int i = 0; i < numClusters; i++) {
-            centroids.add(data.get(random.nextInt(data.size())));
+        // Nodo principal inicializa los datos
+        if (rank == 0) {
+            System.out.println("Nodo principal inicializando datos...");
+            double[][] data = loadData("data.txt");
+            centroids = initializeCentroids(data, numClusters);
+
+            // Dividir datos entre los nodos
+            List<double[]>[] partitions = partitionData(data, size);
+            for (int i = 1; i < size; i++) {
+                MPI.COMM_WORLD.Send(partitions[i], 0, partitions[i].size(), MPI.OBJECT, i, 0);
+            }
+
+            System.out.println("Centroides iniciales:");
+            printCentroids(centroids);
+        } else {
+            System.out.println("Nodo " + rank + " esperando datos...");
         }
 
-        Map<Integer, List<double[]>> clusters = new HashMap<>();
+        // Recibir datos particionados
+        List<double[]> localData = new ArrayList<>();
+        Object[] recvBuffer = new Object[1];
+        MPI.COMM_WORLD.Recv(recvBuffer, 0, 1, MPI.OBJECT, 0, 0);
+        localData = (List<double[]>) recvBuffer[0];
+
         for (int iter = 0; iter < maxIterations; iter++) {
-            clusters.clear();
-
-
-            for (double[] point : data) {
-                int closestCluster = findClosestCluster(point, centroids);
-                clusters.computeIfAbsent(closestCluster, k -> new ArrayList<>()).add(point);
-            }
-
-
-            for (int i = 0; i < numClusters; i++) {
-                List<double[]> clusterPoints = clusters.getOrDefault(i, new ArrayList<>());
-                if (!clusterPoints.isEmpty()) {
-                    centroids.set(i, calculateMean(clusterPoints));
+            if (rank == 0) {
+                for (int i = 1; i < size; i++) {
+                    MPI.COMM_WORLD.Send(centroids, 0, centroids.length, MPI.OBJECT, i, 1);
                 }
+            } else {
+                centroids = new double[numClusters][];
+                MPI.COMM_WORLD.Recv(centroids, 0, numClusters, MPI.OBJECT, 0, 1);
+            }
+
+            int[] assignments = assignToClusters(localData, centroids);
+            if (rank != 0) {
+                MPI.COMM_WORLD.Send(assignments, 0, assignments.length, MPI.INT, 0, 2);
+            } else {
+                int[][] allAssignments = new int[size][];
+                allAssignments[0] = assignments;
+                for (int i = 1; i < size; i++) {
+                    int[] recvAssignments = new int[localData.size()];
+                    MPI.COMM_WORLD.Recv(recvAssignments, 0, recvAssignments.length, MPI.INT, i, 2);
+                    allAssignments[i] = recvAssignments;
+                }
+
+                centroids = updateCentroids(data, allAssignments, numClusters);
+                System.out.println("Iteración " + (iter + 1) + " completada. Nuevos centroides:");
+                printCentroids(centroids);
             }
         }
-        return clusters;
-    }
 
-    private int findClosestCluster(double[] point, List<double[]> centroids) {
-        double minDistance = Double.MAX_VALUE;
-        int clusterIndex = -1;
-        for (int i = 0; i < centroids.size(); i++) {
-            double distance = calculateDistance(point, centroids.get(i));
-            if (distance < minDistance) {
-                minDistance = distance;
-                clusterIndex = i;
-            }
+        if (rank == 0) {
+            System.out.println("K-means completado.");
         }
-        return clusterIndex;
-    }
 
-    private double calculateDistance(double[] point1, double[] point2) {
-        double sum = 0.0;
-        for (int i = 0; i < point1.length; i++) {
-            sum += Math.pow(point1[i] - point2[i], 2);
-        }
-        return Math.sqrt(sum);
-    }
-
-    private double[] calculateMean(List<double[]> points) {
-        int dimensions = points.get(0).length;
-        double[] mean = new double[dimensions];
-        for (double[] point : points) {
-            for (int i = 0; i < dimensions; i++) {
-                mean[i] += point[i];
-            }
-        }
-        for (int i = 0; i < dimensions; i++) {
-            mean[i] /= points.size();
-        }
-        return mean;
+        MPI.Finalize();
     }
 }

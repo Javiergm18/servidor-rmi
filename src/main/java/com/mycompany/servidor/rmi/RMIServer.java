@@ -1,11 +1,8 @@
-package com.mycompany.servidor.rmi;
-
-import java.rmi.registry.LocateRegistry;
-import java.rmi.registry.Registry;
-import java.rmi.server.UnicastRemoteObject;
 import java.io.*;
 import java.net.*;
+import java.nio.file.*;
 import java.util.*;
+import mpi.*;
 
 public class RMIServer implements RMIInterface {
 
@@ -13,61 +10,54 @@ public class RMIServer implements RMIInterface {
     public String processFile(String filePath) {
         try {
 
-            return "Archivo " + filePath + " procesado con éxito.";
+            String sharedDir = "/home/nodo1/mpi_java/";
+            Path destPath = Paths.get(sharedDir, Paths.get(filePath).getFileName().toString());
+            Files.copy(Paths.get(filePath), destPath, StandardCopyOption.REPLACE_EXISTING);
+            System.out.println("Archivo guardado en: " + destPath);
+
+            String mpiCommand = String.format(
+                "mpirun -np 4 --hostfile /home/nodo1/hosts java -cp %s %s",
+                sharedDir, getClassName(destPath.toString())
+            );
+
+            System.out.println("Ejecutando comando MPI: " + mpiCommand);
+            Process mpiProcess = Runtime.getRuntime().exec(mpiCommand);
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(mpiProcess.getInputStream()));
+            StringBuilder output = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                output.append(line).append("\n");
+            }
+
+            int exitCode = mpiProcess.waitFor();
+            if (exitCode != 0) {
+                throw new RuntimeException("Error en la ejecución MPI. Código de salida: " + exitCode);
+            }
+
+            System.out.println("Resultado de MPI:\n" + output);
+            return output.toString();
         } catch (Exception e) {
+            e.printStackTrace();
             return "Error al procesar el archivo: " + e.getMessage();
         }
     }
 
+    private String getClassName(String filePath) {
+        String fileName = Paths.get(filePath).getFileName().toString();
+        return fileName.substring(0, fileName.lastIndexOf('.'));
+    }
+
     public static void main(String[] args) {
         try {
-
             RMIServer server = new RMIServer();
             RMIInterface stub = (RMIInterface) UnicastRemoteObject.exportObject(server, 0);
             Registry registry = LocateRegistry.createRegistry(1099);
             registry.bind("RMIInterface", stub);
             System.out.println("Servidor RMI iniciado en el puerto 1099...");
-
-            Thread tcpServerThread = new Thread(() -> startTCPServer());
-            tcpServerThread.start();
-
         } catch (Exception e) {
             System.err.println("Error en el servidor RMI: " + e.getMessage());
             e.printStackTrace();
         }
     }
-
-    public static void startTCPServer() {
-        try (ServerSocket serverSocket = new ServerSocket(5050)) {
-            System.out.println("Servidor TCP escuchando en el puerto 5050...");
-            while (true) {
-                Socket clientSocket = serverSocket.accept();
-                System.out.println("Cliente conectado: " + clientSocket.getInetAddress());
-
-                // Manejar la conexión en un nuevo hilo
-                new Thread(() -> handleClient(clientSocket)).start();
-            }
-        } catch (IOException e) {
-            System.err.println("Error en el servidor TCP: " + e.getMessage());
-        }
-    }
-    public static void handleClient(Socket clientSocket) {
-        try (
-            BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-            PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true)
-        ) {
-            System.out.println("Cliente conectado: " + clientSocket.getInetAddress());
-            String filePath = in.readLine();
-            System.out.println("Archivo recibido: " + filePath);
-    
-            String result = "Archivo " + filePath + " procesado con éxito.";
-            System.out.println("Resultado generado: " + result);
-    
-            out.println(result);  
-            System.out.println("Resultado enviado al cliente.");
-            out.flush();
-        } catch (IOException e) {
-            System.err.println("Error al manejar cliente: " + e.getMessage());
-        }
-    }
-}    
+}
