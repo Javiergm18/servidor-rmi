@@ -13,7 +13,7 @@ public class KMeansMPI {
         int size = MPI.COMM_WORLD.Size();
 
 
-        int numClusters = 3;
+        int numClusters = 2;
         int maxIterations = 10;
         double[][] centroids = null;
 
